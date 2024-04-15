@@ -65,6 +65,12 @@ namespace nlohmann
 // Grid that contains the entities
 static std::vector<std::vector<entity_t>> entity_grid;
 
+int randomNumber()
+{
+    int number = rand() % NUM_ROWS;
+    return number;
+}
+
 int main()
 {
     crow::SimpleApp app;
@@ -99,6 +105,60 @@ int main()
         // Create the entities
         // <YOUR CODE HERE>
 
+        for (int i = 0; i < (uint32_t)request_body["plants"]; i++) {
+            entity_t newPlant;
+            newPlant.age = 0;
+            newPlant.type = plant;
+            int foundPos = 0;
+            int row;
+            int col;
+            std::cout << i << std::endl;
+            while (foundPos == 0){
+                row = randomNumber();
+                col = randomNumber();
+                std::cout << entity_grid[row][col].type << std::endl;
+                if(entity_grid[row][col].type == empty) {
+                    entity_grid[row][col] = newPlant;
+                    foundPos = 1;
+                }
+            }
+        }
+
+        for (int i = 0; i < (uint32_t)request_body["carnivores"]; i++) {
+            entity_t newCarnivore;
+            newCarnivore.age = 0;
+            newCarnivore.type = carnivore;
+            newCarnivore.energy = 0;
+            int foundPos = 0;
+            int row;
+            int col;
+            while (foundPos == 0){
+                row = randomNumber();
+                col = randomNumber();
+                if(entity_grid[row][col].type == empty) {
+                    entity_grid[row][col] = newCarnivore;
+                    foundPos = 1;
+                }
+            }
+        }
+
+        for (int i = 0; i < (uint32_t)request_body["herbivores"]; i++) {
+            entity_t newHerbivore;
+            newHerbivore.age = 0;
+            newHerbivore.type = herbivore;
+            newHerbivore.energy = 0;
+            int foundPos = 0;
+            int row;
+            int col;
+            while (foundPos == 0){
+                row = randomNumber();
+                col = randomNumber();
+                if(entity_grid[row][col].type == empty) {
+                    entity_grid[row][col] = newHerbivore;
+                    foundPos = 1;
+                }
+            }
+        }
         // Return the JSON representation of the entity grid
         nlohmann::json json_grid = entity_grid; 
         res.body = json_grid.dump();
