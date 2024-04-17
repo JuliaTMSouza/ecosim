@@ -5,10 +5,14 @@
 #include "json.hpp"
 #include <random>
 #include <mutex>
+#include <condition_variable>
 
 static const uint32_t NUM_ROWS = 15;
 
 std::mutex grid;
+std::condition_variable cv;
+bool wake;
+std::mutex mtx_cv;
 
 // Constants
 const uint32_t PLANT_MAXIMUM_AGE = 10;
@@ -69,11 +73,20 @@ namespace nlohmann
 // Grid that contains the entities
 static std::vector<std::vector<entity_t>> entity_grid;
 
-int simulatePlant(int i, int j)
+bool getProbability(double prob)
 {
+    double probPercentage = prob * 100;
+    int random_number = rand() % 100;
+    std::cout << random_number << std::endl;
+    return random_number < probPercentage;
+}
+
+void simulatePlant(int i, int j)
+{
+    std::unique_lock<std::mutex> lock(mtx_cv);
     while (true)
     {
-        // wait
+        cv.wait(lock);
         grid.lock();
         if (entity_grid[i][j].type == morta || entity_grid[i][j].age == PLANT_MAXIMUM_AGE)
         {
@@ -82,26 +95,44 @@ int simulatePlant(int i, int j)
             break;
         }
 
-        if (entity_grid[i + 1][j].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+        if (i + 1 < NUM_ROWS)
         {
-            entity_grid[i + 1][j].type = plant;
-            std::thread p(simulatePlant(i + 1, j));
-            p.detach();
+            std::cout << "i + 1" << (entity_grid[i + 1][j].type == empty) << std::endl;
+            if (entity_grid[i + 1][j].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+            {
+                std::cout << "i " << j + 1 << " j " << j << std::endl;
+                entity_grid[i + 1][j].type = plant;
+            }
         }
-        else if (entity_grid[i][j + 1].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+        if (j + 1 < NUM_ROWS)
+        std::cout << "j+1" << (entity_grid[i][j + 1].type == empty) << std::endl;
         {
-            entity_grid[i][j + 1].type == plant;
+            if (entity_grid[i][j + 1].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+            {
+                std::cout << "i " << i << " j " << j + 1 << std::endl;
+                entity_grid[i][j + 1].type = plant;
+            }
         }
-        else if (entity_grid[i][j - 1].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+        if (j - 1 > 0)
         {
-            entity_grid[i][j - 1].type == plant;
+            std::cout << "j-1" << (entity_grid[i][j - 1].type == empty) << std::endl;
+            if (entity_grid[i][j - 1].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+            {
+                std::cout << "i " << i << " j " << j - 1 << std::endl;
+                entity_grid[i][j - 1].type = plant;
+            }
         }
-        else if (entity_grid[i - 1][j].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+        if (i - 1 > 0)
         {
-            entity_grid[i - 1][j].type == plant;
+            std::cout << "i-1" << (entity_grid[i - 1][j].type == empty) << std::endl;
+            if (entity_grid[i - 1][j].type == empty && getProbability(PLANT_REPRODUCTION_PROBABILITY))
+            {
+                std::cout << "i " << i - 1 << " j " << j << std::endl;
+                entity_grid[i - 1][j].type = plant;
+            }
         }
-        grid.unlock();
         entity_grid[i][j].age++;
+        grid.unlock();
     }
 }
 
@@ -109,13 +140,6 @@ int randomNumber()
 {
     int number = rand() % NUM_ROWS;
     return number;
-}
-
-bool getProbability(int prob)
-{
-    int probPercentage = prob * 100;
-    int number = rand() % 100;
-    return number < probPercentage;
 }
 
 int main()
@@ -167,8 +191,6 @@ int main()
                 if(entity_grid[row][col].type == empty) {
                     entity_grid[row][col] = newPlant;
                     foundPos = 1;
-                    std::thread p(simulatePlant(row, col));
-                    p.detach();
                 }
             }
         }
@@ -219,16 +241,25 @@ int main()
                                {
         // Simulate the next iteration
         // Iterate over the entity grid and simulate the behaviour of each entity
-
-       
         
-        // for (int i = 0; i < NUM_ROWS; i++) {
-        //     for (int j = 0; j < NUM_ROWS; j++) {
-        //         if (entity_grid[i][j].type == plant) {
-        //             simulatePlant(i,j); 
-        //         }
-        //     }
-        // }
+        for (int i = 0; i < NUM_ROWS; i++) {
+            for (int j = 0; j < NUM_ROWS; j++) {
+                if (i == NUM_ROWS - 1 && j == NUM_ROWS - 1) {
+                    std::cout << "mudou wake" << std::endl;
+
+                    
+        cv.notify_all();
+                } else {
+                    std::unique_lock<std::mutex> lock(mtx_cv);
+                    wake = 0;
+                }
+                if (entity_grid[i][j].type == plant && entity_grid[i][j].age == 0) {
+                    std::cout << "Hello" << std::endl;
+                    std::thread p(simulatePlant,i,j); 
+                    p.detach();
+                }
+            }
+        }
       
         
         // Return the JSON representation of the entity grid
